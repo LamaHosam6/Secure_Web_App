@@ -1,9 +1,11 @@
-from flask import Flask, render_template, request, redirect, url_for, session
-import sqlite3
+from flask import Flask, render_template, request, redirect, url_for, session 
+import sqlite3 
+from flask_bcrypt import Bcrypt
+
 
 app = Flask(__name__)
 app.secret_key = 'security_project_key' # For session encryption
-
+bcrypt= Bcrypt(app)
 # Database Setup
 def init_db():
     conn = sqlite3.connect('database.db')
@@ -24,11 +26,16 @@ def register():
         password = request.form['password'] # Stored as plain text (Weak Storage)
         role = 'user' # Default role
         
+        # MITIGATION for Weak Password Storage:
+        # Generate a secure Bcrypt hash of the password before storing it
+        hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+
         conn = sqlite3.connect('database.db')
         cursor = conn.cursor()
         #Vulnerable to SQL Injection (Direct string formatting)
-        query = f"INSERT INTO users (username, password, role) VALUES ('{username}', '{password}', '{role}')"
-        cursor.execute(query)
+        query = f"INSERT INTO users (username, password, role) VALUES (?, ?, ?)"
+        #We pass the hashed_password instead of the regular password
+        cursor.execute(query,(username,hashed_password,role))
         conn.commit()
         conn.close()
         return redirect(url_for('index'))
@@ -41,12 +48,13 @@ def login():
     
     conn = sqlite3.connect('database.db')
     cursor = conn.cursor()
-    # Vulnerable to SQL Injection
-    query = f"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'"
-    user = cursor.execute(query).fetchone()
-    conn.close()
+    # Use parameterized query for SQL Injection mitigation
+    query = f"SELECT * FROM users WHERE username = ? "
+    cursor.execute(query,(username,))
+    user = cursor.fetchone()
+    conn.close() 
 
-    if user:
+    if user and bcrypt.check_password_hash(user[2], password):
         session['username'] = user[1]
         session['role'] = user[3]
         return redirect(url_for('dashboard'))
