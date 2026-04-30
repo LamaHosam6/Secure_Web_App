@@ -54,11 +54,16 @@ def login():
     user = cursor.fetchone()
     conn.close() 
 
+    # Check if a user was found and verify the password hash
+    # bcrypt.check_password_hash securely compares the plain text input 
+    # with the stored hash in the database (user[2])
     if user and bcrypt.check_password_hash(user[2], password):
         session['username'] = user[1]
         session['role'] = user[3]
         return redirect(url_for('dashboard'))
-    return "Login Failed!"
+    else:
+        # If the user doesn't exist or hash doesn't match, access is denied
+        return "Login Failed!"
 
 @app.route('/dashboard')
 def dashboard():
