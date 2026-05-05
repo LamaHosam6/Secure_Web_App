@@ -1,81 +1,121 @@
-from flask import Flask, render_template, request, redirect, url_for, session 
-import sqlite3 
+from flask import Flask, render_template, request, redirect, url_for, session
+import sqlite3
 from flask_bcrypt import Bcrypt
 
-
 app = Flask(__name__)
-app.secret_key = 'security_project_key' # For session encryption
-bcrypt= Bcrypt(app)
-# Database Setup
+app.secret_key = 'security_project_key'
+bcrypt = Bcrypt(app)
+
+# ---------------- DATABASE ----------------
 def init_db():
     conn = sqlite3.connect('database.db')
     cursor = conn.cursor()
-    cursor.execute('''CREATE TABLE IF NOT EXISTS users 
-                      (id INTEGER PRIMARY KEY, username TEXT, password TEXT, role TEXT)''')
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY,
+        username TEXT,
+        password TEXT,
+        role TEXT
+    )''')
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS comments (
+        content TEXT
+    )''')
+
     conn.commit()
     conn.close()
 
+# ---------------- HOME ----------------
 @app.route('/')
 def index():
     return render_template('login.html')
 
+# ---------------- REGISTER ----------------
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         username = request.form['username']
-        password = request.form['password'] # Stored as plain text (Weak Storage)
-        role = 'user' # Default role
-        
-        # MITIGATION for Weak Password Storage:
-        # Generate a secure Bcrypt hash of the password before storing it
-        hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+        password = request.form['password']
+
+        hashed = bcrypt.generate_password_hash(password).decode('utf-8')
 
         conn = sqlite3.connect('database.db')
         cursor = conn.cursor()
-        #Vulnerable to SQL Injection (Direct string formatting)
-        query = f"INSERT INTO users (username, password, role) VALUES (?, ?, ?)"
-        #We pass the hashed_password instead of the regular password
-        cursor.execute(query,(username,hashed_password,role))
+        cursor.execute("INSERT INTO users VALUES (NULL, ?, ?, ?)",
+                       (username, hashed, 'user'))
         conn.commit()
         conn.close()
+
         return redirect(url_for('index'))
+
     return render_template('register.html')
 
+# ---------------- LOGIN ----------------
 @app.route('/login', methods=['POST'])
 def login():
     username = request.form['username']
     password = request.form['password']
-    
+
     conn = sqlite3.connect('database.db')
     cursor = conn.cursor()
-    # Use parameterized query for SQL Injection mitigation
-    query = f"SELECT * FROM users WHERE username = ? "
-    cursor.execute(query,(username,))
+    cursor.execute("SELECT * FROM users WHERE username=?", (username,))
     user = cursor.fetchone()
-    conn.close() 
+    conn.close()
 
-    # Check if a user was found and verify the password hash
-    # bcrypt.check_password_hash securely compares the plain text input 
-    # with the stored hash in the database (user[2])
     if user and bcrypt.check_password_hash(user[2], password):
         session['username'] = user[1]
         session['role'] = user[3]
         return redirect(url_for('dashboard'))
-    else:
-        # If the user doesn't exist or hash doesn't match, access is denied
-        return "Login Failed!"
 
+    return "Login Failed"
+
+# ---------------- DASHBOARD ----------------
 @app.route('/dashboard')
 def dashboard():
-    if 'username' in session:
-        return render_template('dashboard.html', username=session['username'], role=session['role'])
-    return redirect(url_for('index'))
+    if 'username' not in session:
+        return redirect(url_for('index'))
 
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT content FROM comments")
+    comments = cursor.fetchall()
+    conn.close()
+
+    return render_template(
+        'dashboard.html',
+        username=session['username'],
+        role=session['role'],
+        comments=comments
+    )
+# ---------------- COMMENT (XSS VULNERABLE) ----------------
+@app.route('/comment', methods=['POST'])
+def comment():
+    msg = request.form['comment']
+
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO comments VALUES (?)", (msg,))
+    conn.commit()
+    conn.close()
+
+    return redirect(url_for('dashboard'))
+
+# -------- ADMIN (After FIX) --------
+@app.route('/admin')
+def admin():
+    if session.get('role') != 'admin':
+        return "Access Denied", 403
+
+    return render_template("admin.html")
+
+# ---------------- LOGOUT ----------------
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('index'))
 
+
+# ---------------- RUN ----------------
 if __name__ == '__main__':
     init_db()
     app.run(debug=True)

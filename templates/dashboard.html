@@ -1,24 +1,18 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Dashboard</title>
-</head>
-<body>
-    <h1>Welcome to Dashboard</h1>
-    <p>Hello, <strong>{{ username }}</strong>! Your Role: {{ role }}</p>
+<h1>Welcome {{ username }}</h1>
+<p>Role: {{ role }}</p>
 
-    <hr>
-    <h3>Comments (Test XSS here)</h3>
-    <form action="/comment" method="POST">
-        <textarea name="comment" placeholder="Write your comment..."></textarea><br>
-        <button type="submit">Post Comment</button>
-    </form>
-    
-    <div id="comments">
-        </div>
-    
-    <br><br>
-    <a href="/logout">Logout</a>
-</body>
-</html>
+<form method="POST" action="/comment">
+    <textarea name="comment" placeholder="Write comment"></textarea><br>
+    <button>Post</button>
+</form>
+
+<h3>Comments</h3>
+
+{% for c in comments %}
+    <p>{{ c[0] }}</p>
+{% endfor %}
+
+<br>
+
+<a href="/admin">Admin</a><br>
+<a href="/logout">Logout</a>
