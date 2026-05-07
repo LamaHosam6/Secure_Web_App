@@ -9,7 +9,7 @@ atheer
 
 Installation & Setup
 1- Clone the repository:
-git clone [رابط القت هب حقك]
+git clone https://github.com/LamaHosam6/Secure_Web_App.git
 
 2-Install required libraries:
 pip install flask flask-bcrypt pyopenssl
