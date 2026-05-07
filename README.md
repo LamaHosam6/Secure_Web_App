@@ -49,6 +49,9 @@ Test: Observe the URL protocol in the browser.
 Result: Data is transmitted over an encrypted channel, protecting it from interception.
 
 Tech Stack
+
 Backend: Python (Flask)
+
 Security: Bcrypt, SSL/TLS (HTTPS)
+
 Database: SQLite3
