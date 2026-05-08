@@ -3,13 +3,13 @@ Project Overview
 This is a secure Flask application developed to demonstrate common web vulnerabilities and their mitigations. The project covers key security areas including authentication, access control, and data encryption to ensure a safe user experience.
 Team Members:
 
-Lama Abosaada (Team Leader)
+-Lama Abosaada (Team Leader)
 
-Tasnim Almassalma
+-Tasnim Almassalma
 
-Tasnim Kamal
+-Tasnim Kamal
 
-atheer Alwably
+-atheer Alwably
 
 Installation & Setup
 
