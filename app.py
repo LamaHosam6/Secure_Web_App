@@ -3,6 +3,7 @@ import sqlite3
 from flask_bcrypt import Bcrypt
 
 app = Flask(__name__)
+# Security: Secret key signs session cookies to prevent tampering
 app.secret_key = 'security_project_key'
 bcrypt = Bcrypt(app)
 
@@ -11,6 +12,7 @@ def init_db():
     conn = sqlite3.connect('database.db')
     cursor = conn.cursor()
 
+    # Security: 'IF NOT EXISTS' prevents re-creating tables and losing data
     cursor.execute('''CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY,
         username TEXT,
@@ -37,10 +39,14 @@ def register():
         username = request.form['username']
         password = request.form['password']
 
+        # VULNERABILITY 1: Weak Password Storage
+        # FIX: Using Bcrypt hashing (Salted) to store passwords securely
         hashed = bcrypt.generate_password_hash(password).decode('utf-8')
 
         conn = sqlite3.connect('database.db')
         cursor = conn.cursor()
+        # VULNERABILITY 2: SQL Injection
+        # FIX: Using Parameterized Queries (?) to treat input as data, not commands
         cursor.execute("INSERT INTO users VALUES (NULL, ?, ?, ?)",
                        (username, hashed, 'user'))
         conn.commit()
@@ -58,10 +64,12 @@ def login():
 
     conn = sqlite3.connect('database.db')
     cursor = conn.cursor()
+    # Security: SQL Injection protection during login verification
     cursor.execute("SELECT * FROM users WHERE username=?", (username,))
     user = cursor.fetchone()
     conn.close()
 
+    # Security: Safe comparison between user input and hashed password
     if user and bcrypt.check_password_hash(user[2], password):
         session['username'] = user[1]
         session['role'] = user[3]
@@ -81,28 +89,33 @@ def dashboard():
     comments = cursor.fetchall()
     conn.close()
 
+    # VULNERABILITY 3: Stored XSS (Cross-Site Scripting)
+    # FIX: Jinja2 auto-escapes 'comments', rendering them as text, not code
     return render_template(
         'dashboard.html',
         username=session['username'],
         role=session['role'],
         comments=comments
     )
-# ---------------- COMMENT (XSS VULNERABLE) ----------------
+# ---------------- COMMENT ----------------
 @app.route('/comment', methods=['POST'])
 def comment():
     msg = request.form['comment']
 
     conn = sqlite3.connect('database.db')
     cursor = conn.cursor()
+    # Security: Safe insertion of user comments using parameterized queries
     cursor.execute("INSERT INTO comments VALUES (?)", (msg,))
     conn.commit()
     conn.close()
 
     return redirect(url_for('dashboard'))
 
-# -------- ADMIN (After FIX) --------
+# -------- ADMIN --------
 @app.route('/admin')
 def admin():
+    # VULNERABILITY 4: Broken Access Control (IDOR/Unauthorized Access)
+    # FIX: Verifying session['role'] to ensure only admins can view this page
     if session.get('role') != 'admin':
         return "Access Denied", 403
 
@@ -111,6 +124,7 @@ def admin():
 # ---------------- LOGOUT ----------------
 @app.route('/logout')
 def logout():
+    # Security: Proper session termination to prevent session fixation/hijacking
     session.clear()
     return redirect(url_for('index'))
 
@@ -118,4 +132,6 @@ def logout():
 # ---------------- RUN ----------------
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True)
+    # VULNERABILITY 5: Insecure Communication (Plaintext Data)
+    # FIX: Enabling HTTPS (SSL/TLS) to encrypt all data in transit
+    app.run(debug=True, ssl_context='adhoc')
